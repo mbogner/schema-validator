@@ -13,6 +13,8 @@ create issues or even better merge requests.
 
 # Example
 
+Here a sample class using the validator:
+
 ```java
 
 @ValidateSchema(
@@ -27,4 +29,36 @@ public static class ToTest {
 }
 ```
 
-Check the test folder for how to define the two maps.
+And her is how to define the fields:
+
+Schema:
+
+```java
+  Map.of(
+  "name",FieldDefinition.builder().type(String.class.getSimpleName()).notBlank(true).build(),
+  "age",FieldDefinition.builder().type(Integer.class.getSimpleName()).nullable(false).minValue(0L).build(),
+  "time",FieldDefinition.builder().type(Long.class.getSimpleName()).nullable(false).build(),
+  "zero",FieldDefinition.builder().type(Double.class.getSimpleName()).nullable(false).build(),
+  "salary",FieldDefinition.builder().type(BigDecimal.class.getSimpleName()).nullable(false).minValue(0L).maxValue(10000L).build(),
+  "nested",FieldDefinition.builder().type(Object.class.getSimpleName()).nested(
+  Map.of(
+  "test",FieldDefinition.builder().type(String.class.getSimpleName()).notBlank(true).build(),
+  "test2",FieldDefinition.builder().type(Integer.class.getSimpleName()).minValue(0L).build()
+  )
+  ).build());
+```
+
+Data:
+
+```java
+Map.of(
+  "name","stefan",
+  "age",30,
+  "time",System.currentTimeMillis(),
+  "zero",0.0,
+  "salary","2549.50",
+  "nested",Map.of("test","val1","test2",2)
+  );
+```
+
+The tests include these samples if you want to see it in action.
