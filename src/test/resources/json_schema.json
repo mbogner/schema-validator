@@ -1,0 +1,48 @@
+{
+  "title": "TestExample",
+  "description": "simple schema for tests",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "age": {
+      "type": "number",
+      "minimum": 0
+    },
+    "time": {
+      "type": "number",
+      "minimum": 0
+    },
+    "zero": {
+      "type": "number",
+      "minimum": 0
+    },
+    "salary": {
+      "type": "string"
+    },
+    "nested": {
+      "type": "object",
+      "properties": {
+        "test": {
+          "type": "string"
+        },
+        "test2": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "test",
+        "test2"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "age",
+    "time",
+    "zero",
+    "salary",
+    "nested"
+  ]
+}

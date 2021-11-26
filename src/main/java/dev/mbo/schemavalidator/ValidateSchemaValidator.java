@@ -16,6 +16,7 @@
 
 package dev.mbo.schemavalidator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mbo.schemavalidator.fieldvalidator.BigDecimalFieldValidator;
 import dev.mbo.schemavalidator.fieldvalidator.DoubleFieldValidator;
 import dev.mbo.schemavalidator.fieldvalidator.IntegerFieldValidator;
@@ -34,6 +35,8 @@ public class ValidateSchemaValidator implements ConstraintValidator<ValidateSche
 
   private static final Logger LOG = LoggerFactory.getLogger(ValidateSchemaValidator.class);
 
+  // ---------- MAP --------------
+
   public static final FieldValidator<?>[] DEFAULT_FIELD_VALIDATORS = {
     new StringFieldValidator(),
     new IntegerFieldValidator(),
@@ -50,20 +53,20 @@ public class ValidateSchemaValidator implements ConstraintValidator<ValidateSche
    *                   replaces ALL default validators. You can access the default validators via
    *                   <code>DEFAULT_FIELD_VALIDATORS</code>.
    */
-  public static void initValidators(final FieldValidator<?>... validators) {
+  public static void initMapValidators(final FieldValidator<?>... validators) {
     if (null == VALIDATOR_MAP) {
-      LOG.debug("init validators");
+      LOG.debug("init map validators");
       if (null == validators || validators.length < 1) {
         LOG.debug("using default validators");
-        initValidatorsShared(DEFAULT_FIELD_VALIDATORS);
+        initMapValidatorsShared(DEFAULT_FIELD_VALIDATORS);
       } else {
         LOG.debug("using provided validators");
-        initValidatorsShared(validators);
+        initMapValidatorsShared(validators);
       }
     }
   }
 
-  private static void initValidatorsShared(final FieldValidator<?>[] validators) {
+  private static void initMapValidatorsShared(final FieldValidator<?>[] validators) {
     VALIDATOR_MAP = new HashMap<>(validators.length);
     for (final var validator : validators) {
       if (null != VALIDATOR_MAP.put(validator.supportsType().getSimpleName(), validator)) {
@@ -72,12 +75,30 @@ public class ValidateSchemaValidator implements ConstraintValidator<ValidateSche
     }
   }
 
+  // ---------- JSON SCHEMA --------------
+
+  private static ObjectMapper objectMapper = null;
+  private static JsonSchemaCache jsonSchemaCache = null;
+
+  private static void initJsonSchemaValidator() {
+    if (null == jsonSchemaCache) {
+      LOG.debug("init json schema cache");
+      jsonSchemaCache = new JsonSchemaCache();
+      if (null == objectMapper) {
+        objectMapper = new ObjectMapper();
+      }
+    }
+  }
+
+  public static void setObjectMapper(final ObjectMapper externalOM) {
+    objectMapper = externalOM;
+  }
+
   @Override
   public boolean isValid(
     final Object o,
     final ConstraintValidatorContext context
   ) {
-    initValidators();
     try {
       final var dataWithSchema = loadDataWithSchema(o);
       validate(dataWithSchema);
@@ -90,10 +111,26 @@ public class ValidateSchemaValidator implements ConstraintValidator<ValidateSche
 
   // called recursively for nested fields
   private void validate(final DataWithSchema dataWithSchema) {
-    for (final String schemaKey : dataWithSchema.schema.keySet()) {
-      final var schema = dataWithSchema.schema.get(schemaKey);
-      final var data = dataWithSchema.data.get(schemaKey);
-      validateField(schemaKey, schema, data);
+    if (dataWithSchema.type == ValidateType.MAP) {
+      initMapValidators();
+      for (final String schemaKey : dataWithSchema.schema.keySet()) {
+        final var schema = dataWithSchema.schema.get(schemaKey);
+        final var data = dataWithSchema.data.get(schemaKey);
+        validateField(schemaKey, schema, data);
+      }
+    } else if (dataWithSchema.type == ValidateType.JSON_SCHEMA) {
+      initJsonSchemaValidator();
+      validateJsonSchema(dataWithSchema);
+    }
+  }
+
+  private void validateJsonSchema(final DataWithSchema dataWithSchema) {
+    final var jsonSchema = jsonSchemaCache.getOrAdd(dataWithSchema.jsonSchema);
+    final var jsonData = objectMapper.valueToTree(dataWithSchema.data);
+
+    final var result = jsonSchema.validate(jsonData);
+    if (!result.isEmpty()) {
+      throw new IllegalStateException("validation had errors: " + result);
     }
   }
 
@@ -121,7 +158,7 @@ public class ValidateSchemaValidator implements ConstraintValidator<ValidateSche
       LOG.debug("validate nested object");
       final var nestedSchema = fieldDefinition.getNested();
       @SuppressWarnings("unchecked") final var nestedObject = (Map<String, Object>) data;
-      validate(new DataWithSchema(nestedSchema, nestedObject));
+      validate(new DataWithSchema(ValidateType.MAP, nestedSchema, null, nestedObject));
     } catch (final ClassCastException exc) {
       throw new IllegalStateException(exc);
     }
@@ -144,12 +181,23 @@ public class ValidateSchemaValidator implements ConstraintValidator<ValidateSche
     final var clazz = o.getClass();
     final var annotation = clazz.getDeclaredAnnotation(ValidateSchema.class);
 
-    final Map<String, FieldDefinition> schema;
+    final ValidateType validateType = annotation.type();
     final Map<String, Object> data;
+    Map<String, FieldDefinition> schema = null;
+    String jsonSchema = null;
     try {
-      schema = getFieldFromAnnotatedClass(clazz, annotation.schemaFieldName(), o);
       data = getFieldFromAnnotatedClass(clazz, annotation.dataFieldName(), o);
-      return new DataWithSchema(schema, data);
+      switch (validateType) {
+        case MAP:
+          schema = getFieldFromAnnotatedClass(clazz, annotation.schemaFieldName(), o);
+          break;
+        case JSON_SCHEMA:
+          jsonSchema = getFieldFromAnnotatedClass(clazz, annotation.jsonSchema(), o);
+          break;
+        default:
+          throw new IllegalStateException("unsupported type: " + validateType);
+      }
+      return new DataWithSchema(validateType, schema, jsonSchema, data);
     } catch (final ClassCastException | NoSuchFieldException | IllegalAccessException exc) {
       throw new IllegalStateException(exc);
     }
@@ -168,7 +216,9 @@ public class ValidateSchemaValidator implements ConstraintValidator<ValidateSche
 
   @Value
   private static class DataWithSchema {
+    ValidateType type;
     Map<String, FieldDefinition> schema;
+    String jsonSchema;
     Map<String, Object> data;
   }
 

@@ -21,15 +21,13 @@ import org.junit.jupiter.api.Test;
 
 import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ValidateSchemaValidatorSimpleTest extends AbstractValidateSchemaValidatorTest {
+class ValidateMapTest extends AbstractValidatorTest {
 
-  private static final Map<String, FieldDefinition> SHARED_SCHEMA = Map.of(
+  public static final Map<String, FieldDefinition> SHARED_SCHEMA = Map.of(
     "name", FieldDefinition.builder().type(String.class.getSimpleName()).notBlank(true).build(),
     "age", FieldDefinition.builder().type(Integer.class.getSimpleName()).nullable(false).minValue(0L).build(),
     "time", FieldDefinition.builder().type(Long.class.getSimpleName()).nullable(false).build(),
@@ -42,25 +40,6 @@ class ValidateSchemaValidatorSimpleTest extends AbstractValidateSchemaValidatorT
       )
     ).build()
   );
-
-  private Map<String, Object> sharedData() {
-    return Map.of(
-      "name", "stefan",
-      "age", 30,
-      "time", System.currentTimeMillis(),
-      "zero", 0.0,
-      "salary", "2549.50",
-      "nested", Map.of("test", "val1", "test2", 2)
-    );
-  }
-
-  private Map<String, Object> sharedData(
-    final Map<String, Object> toChange
-  ) {
-    final var data = new HashMap<>(sharedData());
-    data.putAll(toChange);
-    return Collections.unmodifiableMap(data);
-  }
 
   @Test
   protected void testValidObject() {
@@ -190,6 +169,7 @@ class ValidateSchemaValidatorSimpleTest extends AbstractValidateSchemaValidatorT
 
   @Builder
   @ValidateSchema(
+    type = ValidateType.MAP,
     schemaFieldName = "schema",
     dataFieldName = "data"
   )

@@ -16,20 +16,38 @@
 
 package dev.mbo.schemavalidator;
 
+import lombok.Builder;
 import org.junit.jupiter.api.Test;
 
-import javax.validation.Validation;
-import javax.validation.Validator;
+import javax.validation.constraints.NotNull;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-abstract class AbstractValidateSchemaValidatorTest {
-
-  protected final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+public class ValidateJsonSchemaTest extends AbstractValidatorTest {
 
   @Test
-  protected void isValid() {
-    assertThat(validator).isNotNull();
+  protected void testValidObject() {
+    final var toTest = ToTest.builder()
+      .schema(FileUtil.slurpFromClasspath("json_schema.json"))
+      .data(sharedData())
+      .build();
+    assertThat(validator.validate(toTest)).isEmpty();
+  }
+
+  @Builder
+  @ValidateSchema(
+    type = ValidateType.JSON_SCHEMA,
+    jsonSchema = "schema",
+    dataFieldName = "data"
+  )
+  public static class ToTest {
+    @NotNull
+    private String schema;
+    @NotNull
+    private Map<String, Object> data;
+
+    private String otherField;
   }
 
 }

@@ -11,9 +11,9 @@ These maps are compatible to be stored as jsonb in PostgreSQL and can be used wi
 This whole project is just a small proof of concept and hasn't been tested in production. If you find any bugs please
 create issues or even better merge requests.
 
-# Example
+# Example for Map schema
 
-Here a sample class using the validator:
+Here a sample class using the map validator:
 
 ```java
 
@@ -62,3 +62,27 @@ Map.of(
 ```
 
 The tests include these samples if you want to see it in action.
+
+# Example for JSON Schema
+
+```java
+
+@Builder
+@ValidateSchema(
+  type = ValidateType.JSON_SCHEMA,
+  jsonSchema = "schema",
+  dataFieldName = "data"
+)
+public static class ToTest {
+  @NotNull
+  private String schema;
+  @NotNull
+  private Map<String, Object> data;
+}
+```
+
+With type set to ValidateType.JSON_SCHEMA the schema field needs to be a string with valid JSON Schema content against
+which the data map is validated against.
+
+To avoid parsing the string schema too often a cache was added which holds the parsed schema for 1 hour (default) before
+they need to be parsed again.
